@@ -83,7 +83,7 @@ if img_file:
         st.image(img, caption=f"{resize_msg} : {new_width}x{new_height}", use_container_width=True)
 
         # 2. AI解析（Gemini 2.5 Flash-Lite）
-        ai_title = "" # 失敗時は空欄にするため初期値は空
+        ai_title = "" 
         with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
             try:
                 model = genai.GenerativeModel('gemini-2.5-flash-lite')
@@ -157,49 +157,48 @@ if img_file:
                     canvas.height = oH;
                     ctx.drawImage(img, 0, 0, oW, oH);
                     
-                    const bW = oW * 0.45; 
-                    const bH = bW * 0.75; // 備考追加に合わせて少し高さを調整
-                    const margin = 20;
+                    // --- 黒板のサイズ（二回り小型化）と位置（左下隅） ---
+                    const bW = oW * 0.3; 
+                    const bH = bW * 0.75; 
+                    const margin = 10; // 隅に寄せるため余白を縮小
                     const bX = margin;
                     const bY = oH - bH - margin;
 
                     ctx.fillStyle = "#004d40"; 
                     ctx.fillRect(bX, bY, bW, bH);
                     ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(bX + 5, bY + 5, bW - 10, bH - 10);
+                    ctx.lineWidth = 2; // サイズに合わせて線も少し細く
+                    ctx.strokeRect(bX + 3, bY + 3, bW - 6, bH - 6);
 
-                    // --- 区切り線の描画 ---
+                    // --- 区切り線 ---
                     ctx.beginPath();
-                    // 横線（3本）
-                    ctx.moveTo(bX + 5, bY + (bH * 0.25)); 
-                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.25));
-                    ctx.moveTo(bX + 5, bY + (bH * 0.5)); 
-                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.5));
-                    ctx.moveTo(bX + 5, bY + (bH * 0.75)); 
-                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.75));
-                    // 縦線
-                    ctx.moveTo(bX + (bW * 0.3), bY + 5); 
-                    ctx.lineTo(bX + (bW * 0.3), bY + bH - 5);
+                    ctx.moveTo(bX + 3, bY + (bH * 0.25)); 
+                    ctx.lineTo(bX + bW - 3, bY + (bH * 0.25));
+                    ctx.moveTo(bX + 3, bY + (bH * 0.5)); 
+                    ctx.lineTo(bX + bW - 3, bY + (bH * 0.5));
+                    ctx.moveTo(bX + 3, bY + (bH * 0.75)); 
+                    ctx.lineTo(bX + bW - 3, bY + (bH * 0.75));
+                    ctx.moveTo(bX + (bW * 0.35), bY + 3); 
+                    ctx.lineTo(bX + (bW * 0.35), bY + bH - 3);
                     ctx.stroke();
 
                     ctx.fillStyle = "white";
-                    const fontSize = Math.floor(bH / 10);
+                    const fontSize = Math.floor(bH / 11);
                     ctx.textBaseline = "middle";
 
-                    // ラベル（文字間隔調整）
-                    ctx.font = fontSize * 0.7 + "px sans-serif";
-                    ctx.fillText("工事件名", bX + 12, bY + (bH * 0.125));
-                    ctx.fillText("工事場所", bX + 12, bY + (bH * 0.375));
-                    ctx.fillText("日　　付", bX + 12, bY + (bH * 0.625));
-                    ctx.fillText("備　　考", bX + 12, bY + (bH * 0.875));
+                    // ラベル（文字間隔調整済み）
+                    ctx.font = fontSize * 0.8 + "px sans-serif";
+                    ctx.fillText("工事件名", bX + 8, bY + (bH * 0.125));
+                    ctx.fillText("工事場所", bX + 8, bY + (bH * 0.375));
+                    ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
+                    ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
 
                     // 内容
                     ctx.font = "bold " + fontSize + "px sans-serif";
-                    ctx.fillText(pjName.substring(0, 18), bX + (bW * 0.33), bY + (bH * 0.125));
-                    ctx.fillText(loc.substring(0, 18), bX + (bW * 0.33), bY + (bH * 0.375));
-                    ctx.fillText(date, bX + (bW * 0.33), bY + (bH * 0.625));
-                    ctx.fillText(note.substring(0, 18), bX + (bW * 0.33), bY + (bH * 0.875));
+                    ctx.fillText(pjName.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.125));
+                    ctx.fillText(loc.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.375));
+                    ctx.fillText(date, bX + (bW * 0.38), bY + (bH * 0.625));
+                    ctx.fillText(note.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.875));
                     
                     const link = document.createElement('a');
                     const downloadName = note ? fileDateStr + "_" + note + ".jpg" : fileDateStr + "_photo.jpg";
