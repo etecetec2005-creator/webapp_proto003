@@ -221,4 +221,29 @@ if img_file:
                     ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
                     ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
                     drawTextWithWrap(pjName, bX + (bW * 0.38), bY + (bH * 0.125));
-                    drawTextWithWrap(loc, bX + (bW * 0.38), bY + (bH * 0.
+                    drawTextWithWrap(loc, bX + (bW * 0.38), bY + (bH * 0.375));
+                    drawTextWithWrap(date, bX + (bW * 0.38), bY + (bH * 0.625));
+                    drawTextWithWrap(note, bX + (bW * 0.38), bY + (bH * 0.875));
+                    
+                    const cleanTitle = note || "名称未設定";
+                    const safeAddr = addr.trim();
+                    const safeLoc = loc.trim();
+                    const downloadName = `${{fileDateStr}}_${{cleanTitle}}_${{safeAddr}}_${{safeLoc}}.jpg`.replace(/[\\/:*?"<>|]/g, "");
+                    
+                    const link = document.createElement('a');
+                    link.download = downloadName;
+                    link.href = canvas.toDataURL('image/jpeg', 0.85); 
+                    link.click();
+                    status.innerText = "✅ 保存完了: " + downloadName;
+                }};
+                img.src = imgBase64;
+            }}
+        }})();
+        </script>
+        """
+        st.components.v1.html(auto_save_script, height=130)
+
+    except Exception as e:
+        st.error(f"エラーが発生しました: {e}")
+else:
+    st.info("上のボタンからカメラを起動して撮影してください。")
