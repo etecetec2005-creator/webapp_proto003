@@ -15,7 +15,7 @@ genai.configure(api_key=api_key)
 
 # --- 基本設定 ---
 st.set_page_config(page_title="e-Photo_000", layout="centered")
-st.title("📸 e-Photo")
+st.title("📸 e-Photo📝黒板")
 
 # --- URLパラメータによる工事件名の保持・復元 ---
 url_params = st.query_params
@@ -170,7 +170,6 @@ if img_file:
                     const bH = bW * 0.75; 
                     const margin = 10;
                     
-                    // 配置座標の計算
                     let bX, bY;
                     if (pos === "左下") {{ bX = margin; bY = oH - bH - margin; }}
                     else if (pos === "右下") {{ bX = oW - bW - margin; bY = oH - bH - margin; }}
@@ -196,19 +195,33 @@ if img_file:
 
                     ctx.fillStyle = "white";
                     const fontSize = Math.floor(bH / 11);
-                    ctx.textBaseline = "middle";
+                    
+                    // 改行描画用関数
+                    function drawTextWithWrap(text, x, y) {{
+                        if (text.length > 10) {{
+                            const line1 = text.substring(0, 10);
+                            const line2 = text.substring(10, 20);
+                            ctx.font = "bold " + (fontSize * 0.85) + "px sans-serif";
+                            ctx.fillText(line1, x, y - (fontSize * 0.4));
+                            ctx.fillText(line2, x, y + (fontSize * 0.5));
+                        }} else {{
+                            ctx.font = "bold " + fontSize + "px sans-serif";
+                            ctx.fillText(text, x, y);
+                        }}
+                    }}
 
+                    ctx.textBaseline = "middle";
                     ctx.font = fontSize * 0.8 + "px sans-serif";
                     ctx.fillText("工事件名", bX + 8, bY + (bH * 0.125));
                     ctx.fillText("工事場所", bX + 8, bY + (bH * 0.375));
                     ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
                     ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
 
-                    ctx.font = "bold " + fontSize + "px sans-serif";
-                    ctx.fillText(pjName.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.125));
-                    ctx.fillText(loc.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.375));
-                    ctx.fillText(date, bX + (bW * 0.38), bY + (bH * 0.625));
-                    ctx.fillText(note.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.875));
+                    // 内容の描画（改行対応）
+                    drawTextWithWrap(pjName, bX + (bW * 0.38), bY + (bH * 0.125));
+                    drawTextWithWrap(loc, bX + (bW * 0.38), bY + (bH * 0.375));
+                    drawTextWithWrap(date, bX + (bW * 0.38), bY + (bH * 0.625));
+                    drawTextWithWrap(note, bX + (bW * 0.38), bY + (bH * 0.875));
                     
                     const link = document.createElement('a');
                     const downloadName = note ? fileDateStr + "_" + note + ".jpg" : fileDateStr + "_photo.jpg";
