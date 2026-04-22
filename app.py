@@ -14,7 +14,7 @@ if not api_key:
 genai.configure(api_key=api_key)
 
 # --- 基本設定 ---
-st.set_page_config(page_title="e-Photo_000", layout="centered")
+st.set_page_config(page_title="e-Photo📝黒板", layout="centered")
 st.title("📸 e-Photo📝黒板")
 
 # --- URLパラメータによる工事件名の保持・復元 ---
@@ -142,21 +142,35 @@ if img_file:
                     const lat = pos.coords.latitude;
                     const lon = pos.coords.longitude;
                     let stationName = "駅名不明";
+                    let shortAddress = "住所不明";
 
                     try {{
+                        // 住所取得 (Nominatim)
+                        const addrRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${{lat}}&lon=${{lon}}&addressdetails=1`, {{
+                            headers: {{ 'Accept-Language': 'ja' }}
+                        }});
+                        const addrData = await addrRes.json();
+                        if (addrData.address) {{
+                            const a = addrData.address;
+                            // 丁目までで止める（通りや道路名を排除）
+                            shortAddress = (a.province || a.state || "") + (a.city || a.town || "") + (a.suburb || a.neighbourhood || "");
+                        }}
+
+                        // 駅名取得
                         const stRes = await fetch(`https://express.heartrails.com/api/json?method=getStations&x=${{lon}}&y=${{lat}}`);
                         const stData = await stRes.json();
                         if (stData.response && stData.response.station && stData.response.station.length > 0) {{
                             stationName = stData.response.station[0].name + "駅";
                         }}
                     }} catch (e) {{ console.error(e); }}
-                    drawBoard(projectName, stationName, dateStr, aiTitle, posSetting);
+                    
+                    drawBoard(projectName, stationName, dateStr, aiTitle, posSetting, shortAddress);
                 }},
-                (err) => {{ drawBoard(projectName, "位置情報なし", dateStr, aiTitle, posSetting); }},
+                (err) => {{ drawBoard(projectName, "位置情報なし", dateStr, aiTitle, posSetting, "住所取得失敗"); }},
                 {{ enableHighAccuracy: true, timeout: 8000 }}
             );
 
-            function drawBoard(pjName, loc, date, note, pos) {{
+            function drawBoard(pjName, loc, date, note, pos, addr) {{
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
@@ -196,7 +210,6 @@ if img_file:
                     ctx.fillStyle = "white";
                     const fontSize = Math.floor(bH / 11);
                     
-                    // 改行描画用関数
                     function drawTextWithWrap(text, x, y) {{
                         if (text.length > 10) {{
                             const line1 = text.substring(0, 10);
@@ -217,20 +230,24 @@ if img_file:
                     ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
                     ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
 
-                    // 内容の描画（改行対応）
                     drawTextWithWrap(pjName, bX + (bW * 0.38), bY + (bH * 0.125));
                     drawTextWithWrap(loc, bX + (bW * 0.38), bY + (bH * 0.375));
                     drawTextWithWrap(date, bX + (bW * 0.38), bY + (bH * 0.625));
                     drawTextWithWrap(note, bX + (bW * 0.38), bY + (bH * 0.875));
                     
+                    // ファイル名生成: 日時_タイトル_住所_駅名 (件名なし)
+                    const cleanTitle = note || "名称未設定";
+                    const safeAddr = addr.trim();
+                    const safeLoc = loc.trim();
+                    const downloadName = `${{fileDateStr}}_${{cleanTitle}}_${{safeAddr}}_${{safeLoc}}.jpg`.replace(/[\\/:*?"<>|]/g, "");
+                    
                     const link = document.createElement('a');
-                    const downloadName = note ? fileDateStr + "_" + note + ".jpg" : fileDateStr + "_photo.jpg";
                     link.download = downloadName;
                     link.href = canvas.toDataURL('image/jpeg', 0.85); 
                     link.click();
                     
                     status.style.color = "#1b5e20";
-                    status.innerText = "✅ 保存完了。リセットを押して次の撮影へ";
+                    status.innerText = "✅ 保存完了: " + downloadName;
                 }};
                 img.src = imgBase64;
             }}
