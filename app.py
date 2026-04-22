@@ -90,24 +90,31 @@ if img_file:
         
         st.image(img, caption=f"{resize_msg} : {new_width}x{new_height}", use_container_width=True)
 
-        # AI解析
+        # 2. AI解析
         ai_title = "" 
         with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
             try:
                 model = genai.GenerativeModel('gemini-2.5-flash-lite')
-                prompt = "この写真の内容を分析し、20文字以内の日本語タイトルを1つだけ出力してください。"
+                prompt = """この写真の内容を分析し、20文字以内の日本語タイトルを1つだけ出力してください。
+【留意事項】写真には電気設備が写っている場合が多くあります。その場合、特に写実的で具体的なタイトルとしてください。
+写真に文字や数字が写っている場合はタイトルにその内容も加えてください。
+ただし、その文字や数字だけのタイトルにはしないでください。"""
+                
                 response = model.generate_content([prompt, img])
                 if response and response.text:
                     ai_title = response.text.strip().replace("\n", "").replace("/", "-").replace(" ", "")
             except Exception:
                 ai_title = "解析不可"
 
-        # 画像のBase64変換
+        # 3. 画像のBase64変換
         buffered = io.BytesIO()
         img.save(buffered, format="JPEG", quality=85) 
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        # JS側の波括弧を二重（{{ }}）にしてPythonのf-stringと衝突させないように修正
+        # 4. 全自動JavaScript (波括弧を二重にしてPython f-stringと衝突回避)
+        if ai_title:
+            st.success(f"解析タイトル確定: {ai_title}")
+        
         auto_save_script = f"""
         <div id="status" style="font-size:12px; color:gray; padding:10px; background:#f9f9f9; border-radius:5px; border-left: 5px solid #2e7d32; margin-top: 10px;">
             📍 工事黒板を合成して自動保存します...
@@ -176,6 +183,7 @@ if img_file:
                     const bW = oW * 0.3; 
                     const bH = bW * 0.75; 
                     const margin = 10;
+                    
                     let bX, bY;
                     if (pos === "左下") {{ bX = margin; bY = oH - bH - margin; }}
                     else if (pos === "右下") {{ bX = oW - bW - margin; bY = oH - bH - margin; }}
@@ -201,6 +209,7 @@ if img_file:
 
                     ctx.fillStyle = "white";
                     const fontSize = Math.floor(bH / 11);
+                    
                     function drawTextWithWrap(text, x, y) {{
                         if (text.length > 10) {{
                             const line1 = text.substring(0, 10);
@@ -220,6 +229,7 @@ if img_file:
                     ctx.fillText("工事場所", bX + 8, bY + (bH * 0.375));
                     ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
                     ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
+
                     drawTextWithWrap(pjName, bX + (bW * 0.38), bY + (bH * 0.125));
                     drawTextWithWrap(loc, bX + (bW * 0.38), bY + (bH * 0.375));
                     drawTextWithWrap(date, bX + (bW * 0.38), bY + (bH * 0.625));
@@ -234,6 +244,7 @@ if img_file:
                     link.download = downloadName;
                     link.href = canvas.toDataURL('image/jpeg', 0.85); 
                     link.click();
+                    
                     status.innerText = "✅ 保存完了: " + downloadName;
                 }};
                 img.src = imgBase64;
@@ -243,7 +254,7 @@ if img_file:
         """
         st.components.v1.html(auto_save_script, height=130)
 
-    except Exception as e:
-        st.error(f"エラーが発生しました: {e}")
+    except Exception as outer_e:
+        st.error(f"エラーが発生しました: {outer_e}")
 else:
     st.info("上のボタンからカメラを起動して撮影してください。")
