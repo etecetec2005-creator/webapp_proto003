@@ -15,10 +15,9 @@ genai.configure(api_key=api_key)
 
 # --- 基本設定 ---
 st.set_page_config(page_title="e-Photo_000", layout="centered")
-st.title("📸 e-Photo　黒板")
+st.title("📸 e-Photo")
 
 # --- URLパラメータによる工事件名の保持・復元 ---
-# URLに project_name があればそれを初期値にする
 url_params = st.query_params
 initial_project_name = url_params.get("project_name", "")
 
@@ -43,7 +42,6 @@ if "uploader_key" not in st.session_state:
     st.session_state["uploader_key"] = 0
 
 def reset_app():
-    # project_name 以外を削除
     for key in list(st.session_state.keys()):
         if key != "project_name":
             del st.session_state[key]
@@ -58,7 +56,6 @@ if not st.session_state["project_name"]:
     st.warning("⚠️ 撮影の前に、ページ上部で「工事件名」を入力してください。")
     st.stop()
 
-# Android/iPhone共通：単一ファイル選択
 img_file = st.file_uploader(
     "撮影または画像を選択", 
     type=["jpg", "jpeg", "png"], 
@@ -86,7 +83,7 @@ if img_file:
         st.image(img, caption=f"{resize_msg} : {new_width}x{new_height}", use_container_width=True)
 
         # 2. AI解析（Gemini 2.5 Flash-Lite）
-        ai_title = "名称未設定"
+        ai_title = "" # 失敗時は空欄にするため初期値は空
         with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
             try:
                 model = genai.GenerativeModel('gemini-2.5-flash-lite')
@@ -99,7 +96,7 @@ if img_file:
                 if response and response.text:
                     ai_title = response.text.strip().replace("\n", "").replace("/", "-").replace(" ", "")
             except Exception as e:
-                st.warning("⚠️ AI解析がタイムアウトしました。")
+                st.warning("⚠️ AI解析がタイムアウトしました。備考欄は空欄となります。")
 
         # 3. 画像のBase64変換
         buffered = io.BytesIO()
@@ -107,7 +104,8 @@ if img_file:
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
         # 4. 全自動JavaScript（黒板描画機能付き）
-        st.success(f"解析タイトル: {ai_title}")
+        if ai_title:
+            st.success(f"解析タイトル確定: {ai_title}")
         
         auto_save_script = f"""
         <div id="status" style="font-size:12px; color:gray; padding:10px; background:#f9f9f9; border-radius:5px; border-left: 5px solid #2e7d32; margin-top: 10px;">
@@ -143,13 +141,13 @@ if img_file:
                             stationName = stData.response.station[0].name + "駅";
                         }}
                     }} catch (e) {{ console.error(e); }}
-                    drawBoard(projectName, stationName, dateStr);
+                    drawBoard(projectName, stationName, dateStr, aiTitle);
                 }},
-                (err) => {{ drawBoard(projectName, "位置情報なし", dateStr); }},
+                (err) => {{ drawBoard(projectName, "位置情報なし", dateStr, aiTitle); }},
                 {{ enableHighAccuracy: true, timeout: 8000 }}
             );
 
-            function drawBoard(pjName, loc, date) {{
+            function drawBoard(pjName, loc, date, note) {{
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
@@ -159,8 +157,8 @@ if img_file:
                     canvas.height = oH;
                     ctx.drawImage(img, 0, 0, oW, oH);
                     
-                    const bW = oW * 0.4; 
-                    const bH = bW * 0.65;
+                    const bW = oW * 0.45; 
+                    const bH = bW * 0.75; // 備考追加に合わせて少し高さを調整
                     const margin = 20;
                     const bX = margin;
                     const bY = oH - bH - margin;
@@ -171,31 +169,41 @@ if img_file:
                     ctx.lineWidth = 3;
                     ctx.strokeRect(bX + 5, bY + 5, bW - 10, bH - 10);
 
+                    // --- 区切り線の描画 ---
                     ctx.beginPath();
-                    ctx.moveTo(bX + 5, bY + (bH * 0.35)); 
-                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.35));
-                    ctx.moveTo(bX + 5, bY + (bH * 0.7)); 
-                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.7));
+                    // 横線（3本）
+                    ctx.moveTo(bX + 5, bY + (bH * 0.25)); 
+                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.25));
+                    ctx.moveTo(bX + 5, bY + (bH * 0.5)); 
+                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.5));
+                    ctx.moveTo(bX + 5, bY + (bH * 0.75)); 
+                    ctx.lineTo(bX + bW - 5, bY + (bH * 0.75));
+                    // 縦線
                     ctx.moveTo(bX + (bW * 0.3), bY + 5); 
                     ctx.lineTo(bX + (bW * 0.3), bY + bH - 5);
                     ctx.stroke();
 
                     ctx.fillStyle = "white";
-                    const fontSize = Math.floor(bH / 9);
+                    const fontSize = Math.floor(bH / 10);
                     ctx.textBaseline = "middle";
 
+                    // ラベル（文字間隔調整）
                     ctx.font = fontSize * 0.7 + "px sans-serif";
-                    ctx.fillText("工事件名", bX + 12, bY + (bH * 0.17));
-                    ctx.fillText("工事場所", bX + 12, bY + (bH * 0.52));
-                    ctx.fillText("日　付", bX + 12, bY + (bH * 0.85));
+                    ctx.fillText("工事件名", bX + 12, bY + (bH * 0.125));
+                    ctx.fillText("工事場所", bX + 12, bY + (bH * 0.375));
+                    ctx.fillText("日　　付", bX + 12, bY + (bH * 0.625));
+                    ctx.fillText("備　　考", bX + 12, bY + (bH * 0.875));
 
+                    // 内容
                     ctx.font = "bold " + fontSize + "px sans-serif";
-                    ctx.fillText(pjName.substring(0, 15), bX + (bW * 0.33), bY + (bH * 0.17));
-                    ctx.fillText(loc.substring(0, 15), bX + (bW * 0.33), bY + (bH * 0.52));
-                    ctx.fillText(date, bX + (bW * 0.33), bY + (bH * 0.85));
+                    ctx.fillText(pjName.substring(0, 18), bX + (bW * 0.33), bY + (bH * 0.125));
+                    ctx.fillText(loc.substring(0, 18), bX + (bW * 0.33), bY + (bH * 0.375));
+                    ctx.fillText(date, bX + (bW * 0.33), bY + (bH * 0.625));
+                    ctx.fillText(note.substring(0, 18), bX + (bW * 0.33), bY + (bH * 0.875));
                     
                     const link = document.createElement('a');
-                    link.download = fileDateStr + "_" + aiTitle + ".jpg";
+                    const downloadName = note ? fileDateStr + "_" + note + ".jpg" : fileDateStr + "_photo.jpg";
+                    link.download = downloadName;
                     link.href = canvas.toDataURL('image/jpeg', 0.85); 
                     link.click();
                     
