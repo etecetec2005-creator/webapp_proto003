@@ -92,7 +92,7 @@ if img_file:
 
         # 2. AI解析
         ai_title = "" 
-        with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
+        with st.spinner("分析中..."):
             try:
                 model = genai.GenerativeModel('gemini-2.5-flash-lite')
                 prompt = """この写真の内容を分析し、20文字以内の日本語タイトルを1つだけ出力してください。
@@ -111,7 +111,7 @@ if img_file:
         img.save(buffered, format="JPEG", quality=85) 
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        # 4. 全自動JavaScript (波括弧を二重にしてPython f-stringと衝突回避)
+        # 4. 全自動JavaScript
         if ai_title:
             st.success(f"解析タイトル確定: {ai_title}")
         
@@ -142,21 +142,31 @@ if img_file:
                     const lat = pos.coords.latitude;
                     const lon = pos.coords.longitude;
                     let stationName = "駅名不明";
-                    let shortAddress = "住所不明";
+                    let fullAddressNoPref = "住所不明";
 
                     try {{
+                        // 住所取得 (Nominatim)
                         const addrRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${{lat}}&lon=${{lon}}&addressdetails=1`, {{
                             headers: {{ 'Accept-Language': 'ja' }}
                         }});
                         const addrData = await addrRes.json();
+                        
                         if (addrData.address) {{
                             const a = addrData.address;
+                            // 都道府県（province, state）を除いた情報を連結
                             const city = a.city || a.town || a.city_district || "";
                             const suburb = a.suburb || a.neighbourhood || "";
-                            const block = a.village || a.subdistrict || ""; 
-                            shortAddress = city + suburb + block;
+                            const village = a.village || a.subdistrict || "";
+                            const road = a.road || "";
+                            const houseNumber = a.house_number || "";
+                            
+                            // 府県名なしの住所を構築
+                            fullAddressNoPref = city + suburb + village + road + houseNumber;
+                            
+                            if (!fullAddressNoPref) fullAddressNoPref = "住所詳細不明";
                         }}
 
+                        // 駅名取得 (HeartRails)
                         const stRes = await fetch(`https://express.heartrails.com/api/json?method=getStations&x=${{lon}}&y=${{lat}}`);
                         const stData = await stRes.json();
                         if (stData.response && stData.response.station && stData.response.station.length > 0) {{
@@ -164,7 +174,7 @@ if img_file:
                         }}
                     }} catch (e) {{ console.error(e); }}
                     
-                    drawBoard(projectName, stationName, dateStr, aiTitle, posSetting, shortAddress);
+                    drawBoard(projectName, stationName, dateStr, aiTitle, posSetting, fullAddressNoPref);
                 }},
                 (err) => {{ drawBoard(projectName, "位置情報なし", dateStr, aiTitle, posSetting, "住所取得失敗"); }},
                 {{ enableHighAccuracy: true, timeout: 8000 }}
@@ -235,6 +245,7 @@ if img_file:
                     drawTextWithWrap(date, bX + (bW * 0.38), bY + (bH * 0.625));
                     drawTextWithWrap(note, bX + (bW * 0.38), bY + (bH * 0.875));
                     
+                    // ファイル名生成: 日時_タイトル_詳細住所(府県なし)_駅名
                     const cleanTitle = note || "名称未設定";
                     const safeAddr = addr.trim();
                     const safeLoc = loc.trim();
