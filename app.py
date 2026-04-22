@@ -37,13 +37,21 @@ if input_val != st.session_state["project_name"]:
     st.query_params["project_name"] = input_val
     st.rerun()
 
+# --- 黒板の配置設定 ---
+board_position = st.radio(
+    "黒板の配置位置を選択してください",
+    ["左下", "右下", "左上", "右上"],
+    index=0,
+    horizontal=True
+)
+
 # --- リセット機能 ---
 if "uploader_key" not in st.session_state:
     st.session_state["uploader_key"] = 0
 
 def reset_app():
     for key in list(st.session_state.keys()):
-        if key != "project_name":
+        if key not in ["project_name"]:
             del st.session_state[key]
     st.session_state["uploader_key"] = st.session_state.get("uploader_key", 0) + 1
     st.rerun()
@@ -82,7 +90,7 @@ if img_file:
         
         st.image(img, caption=f"{resize_msg} : {new_width}x{new_height}", use_container_width=True)
 
-        # 2. AI解析（Gemini 2.5 Flash-Lite）
+        # 2. AI解析
         ai_title = "" 
         with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
             try:
@@ -103,7 +111,7 @@ if img_file:
         img.save(buffered, format="JPEG", quality=85, subsampling=0) 
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        # 4. 全自動JavaScript（黒板描画機能付き）
+        # 4. 全自動JavaScript
         if ai_title:
             st.success(f"解析タイトル確定: {ai_title}")
         
@@ -119,6 +127,7 @@ if img_file:
             const imgBase64 = "data:image/jpeg;base64,{img_str}";
             const oW = {new_width};
             const oH = {new_height};
+            const posSetting = "{board_position}";
 
             const now = new Date();
             const dateStr = now.getFullYear() + "/" + ('0' + (now.getMonth() + 1)).slice(-2) + "/" + ('0' + now.getDate()).slice(-2);
@@ -141,13 +150,13 @@ if img_file:
                             stationName = stData.response.station[0].name + "駅";
                         }}
                     }} catch (e) {{ console.error(e); }}
-                    drawBoard(projectName, stationName, dateStr, aiTitle);
+                    drawBoard(projectName, stationName, dateStr, aiTitle, posSetting);
                 }},
-                (err) => {{ drawBoard(projectName, "位置情報なし", dateStr, aiTitle); }},
+                (err) => {{ drawBoard(projectName, "位置情報なし", dateStr, aiTitle, posSetting); }},
                 {{ enableHighAccuracy: true, timeout: 8000 }}
             );
 
-            function drawBoard(pjName, loc, date, note) {{
+            function drawBoard(pjName, loc, date, note, pos) {{
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
@@ -157,20 +166,23 @@ if img_file:
                     canvas.height = oH;
                     ctx.drawImage(img, 0, 0, oW, oH);
                     
-                    // --- 黒板のサイズ（二回り小型化）と位置（左下隅） ---
                     const bW = oW * 0.3; 
                     const bH = bW * 0.75; 
-                    const margin = 10; // 隅に寄せるため余白を縮小
-                    const bX = margin;
-                    const bY = oH - bH - margin;
+                    const margin = 10;
+                    
+                    // 配置座標の計算
+                    let bX, bY;
+                    if (pos === "左下") {{ bX = margin; bY = oH - bH - margin; }}
+                    else if (pos === "右下") {{ bX = oW - bW - margin; bY = oH - bH - margin; }}
+                    else if (pos === "左上") {{ bX = margin; bY = margin; }}
+                    else if (pos === "右上") {{ bX = oW - bW - margin; bY = margin; }}
 
                     ctx.fillStyle = "#004d40"; 
                     ctx.fillRect(bX, bY, bW, bH);
                     ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 2; // サイズに合わせて線も少し細く
+                    ctx.lineWidth = 2;
                     ctx.strokeRect(bX + 3, bY + 3, bW - 6, bH - 6);
 
-                    // --- 区切り線 ---
                     ctx.beginPath();
                     ctx.moveTo(bX + 3, bY + (bH * 0.25)); 
                     ctx.lineTo(bX + bW - 3, bY + (bH * 0.25));
@@ -186,14 +198,12 @@ if img_file:
                     const fontSize = Math.floor(bH / 11);
                     ctx.textBaseline = "middle";
 
-                    // ラベル（文字間隔調整済み）
                     ctx.font = fontSize * 0.8 + "px sans-serif";
                     ctx.fillText("工事件名", bX + 8, bY + (bH * 0.125));
                     ctx.fillText("工事場所", bX + 8, bY + (bH * 0.375));
                     ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
                     ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
 
-                    // 内容
                     ctx.font = "bold " + fontSize + "px sans-serif";
                     ctx.fillText(pjName.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.125));
                     ctx.fillText(loc.substring(0, 15), bX + (bW * 0.38), bY + (bH * 0.375));
