@@ -17,21 +17,31 @@ genai.configure(api_key=api_key)
 st.set_page_config(page_title="e-Photo_000", layout="centered")
 st.title("📸 e-Photo")
 
-# --- セッション状態の初期化 ---
+# --- URLパラメータによる工事件名の保持・復元 ---
+# URLに project_name があればそれを初期値にする
+url_params = st.query_params
+initial_project_name = url_params.get("project_name", "")
+
 if "project_name" not in st.session_state:
-    st.session_state["project_name"] = ""
+    st.session_state["project_name"] = initial_project_name
 
-if "uploader_key" not in st.session_state:
-    st.session_state["uploader_key"] = 0
-
-# --- 工事件名の入力エリア ---
-st.session_state["project_name"] = st.text_input(
-    "工事件名を入力してください（アプリを閉じるまで保持されます）",
+# 入力フォーム
+input_val = st.text_input(
+    "工事件名を入力してください（URLに保存されます）",
     value=st.session_state["project_name"],
     placeholder="例：〇〇ビル電気設備工事"
 )
 
+# 入力内容が変更されたらURLとセッションを更新
+if input_val != st.session_state["project_name"]:
+    st.session_state["project_name"] = input_val
+    st.query_params["project_name"] = input_val
+    st.rerun()
+
 # --- リセット機能 ---
+if "uploader_key" not in st.session_state:
+    st.session_state["uploader_key"] = 0
+
 def reset_app():
     # project_name 以外を削除
     for key in list(st.session_state.keys()):
@@ -43,12 +53,12 @@ def reset_app():
 if st.button("🔄 画面をリセットして最初に戻る"):
     reset_app()
 
-# 工事件名が入力されていない場合はアップローダーを表示しない
+# 工事件名ガード
 if not st.session_state["project_name"]:
     st.warning("⚠️ 撮影の前に、ページ上部で「工事件名」を入力してください。")
     st.stop()
 
-# Androidの挙動を安定させるため、単一ファイル選択を明示
+# Android/iPhone共通：単一ファイル選択
 img_file = st.file_uploader(
     "撮影または画像を選択", 
     type=["jpg", "jpeg", "png"], 
@@ -58,20 +68,13 @@ img_file = st.file_uploader(
 
 if img_file:
     try:
-        # ファイルサイズの取得 (MB)
         file_size_mb = img_file.size / (1024 * 1024)
-        
-        # 1. 画像の読み込み
         raw_img = Image.open(img_file)
-        
-        # 回転補正
         img = ImageOps.exif_transpose(raw_img)
         
-        # --- 条件付きリサイズ処理 ---
         original_width, original_height = img.size
         
         if file_size_mb >= 1.0:
-            # 1MB以上の場合は1/2にリサイズ（黒板の文字視認性のため1/2を推奨）
             new_width = original_width // 2
             new_height = original_height // 2
             img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
@@ -83,7 +86,6 @@ if img_file:
         st.image(img, caption=f"{resize_msg} : {new_width}x{new_height}", use_container_width=True)
 
         # 2. AI解析（Gemini 2.5 Flash-Lite）
-        # ※黒板には入力した工事件名を使い、ファイル名や補助としてAIタイトルを利用
         ai_title = "名称未設定"
         with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
             try:
@@ -97,7 +99,7 @@ if img_file:
                 if response and response.text:
                     ai_title = response.text.strip().replace("\n", "").replace("/", "-").replace(" ", "")
             except Exception as e:
-                st.warning("⚠️ AI解析がタイムアウトしました。タイトルなしで続行します。")
+                st.warning("⚠️ AI解析がタイムアウトしました。")
 
         # 3. 画像のBase64変換
         buffered = io.BytesIO()
@@ -157,23 +159,18 @@ if img_file:
                     canvas.height = oH;
                     ctx.drawImage(img, 0, 0, oW, oH);
                     
-                    // --- 黒板のサイズ・位置設定 ---
                     const bW = oW * 0.4; 
                     const bH = bW * 0.65;
                     const margin = 20;
                     const bX = margin;
                     const bY = oH - bH - margin;
 
-                    // 1. 黒板の本体
                     ctx.fillStyle = "#004d40"; 
                     ctx.fillRect(bX, bY, bW, bH);
-
-                    // 2. 枠線
                     ctx.strokeStyle = "#ffffff";
                     ctx.lineWidth = 3;
                     ctx.strokeRect(bX + 5, bY + 5, bW - 10, bH - 10);
 
-                    // 3. 区切り線
                     ctx.beginPath();
                     ctx.moveTo(bX + 5, bY + (bH * 0.35)); 
                     ctx.lineTo(bX + bW - 5, bY + (bH * 0.35));
@@ -183,24 +180,20 @@ if img_file:
                     ctx.lineTo(bX + (bW * 0.3), bY + bH - 5);
                     ctx.stroke();
 
-                    // 4. 文字描画
                     ctx.fillStyle = "white";
                     const fontSize = Math.floor(bH / 9);
                     ctx.textBaseline = "middle";
 
-                    // ラベル
                     ctx.font = fontSize * 0.7 + "px sans-serif";
                     ctx.fillText("工事件名", bX + 12, bY + (bH * 0.17));
                     ctx.fillText("工事場所", bX + 12, bY + (bH * 0.52));
                     ctx.fillText("日　付", bX + 12, bY + (bH * 0.85));
 
-                    // 内容（入力された工事件名を使用）
                     ctx.font = "bold " + fontSize + "px sans-serif";
                     ctx.fillText(pjName.substring(0, 15), bX + (bW * 0.33), bY + (bH * 0.17));
                     ctx.fillText(loc.substring(0, 15), bX + (bW * 0.33), bY + (bH * 0.52));
                     ctx.fillText(date, bX + (bW * 0.33), bY + (bH * 0.85));
                     
-                    // 保存
                     const link = document.createElement('a');
                     link.download = fileDateStr + "_" + aiTitle + ".jpg";
                     link.href = canvas.toDataURL('image/jpeg', 0.85); 
@@ -220,6 +213,5 @@ if img_file:
         st.error("画像の読み込みに失敗しました。")
         if st.button("もう一度試す"):
             reset_app()
-
 else:
     st.info("上のボタンからカメラを起動して撮影してください。")
