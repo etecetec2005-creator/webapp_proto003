@@ -15,7 +15,7 @@ genai.configure(api_key=api_key)
 
 # --- 基本設定 ---
 st.set_page_config(page_title="e-Photo_000", layout="centered")
-st.title("📸 e-Photo")
+st.title("📸 e-Photo　黒板")
 
 # --- URLパラメータによる工事件名の保持・復元 ---
 # URLに project_name があればそれを初期値にする
