@@ -37,23 +37,37 @@ if input_val != st.session_state["project_name"]:
     st.query_params["project_name"] = input_val
     st.rerun()
 
-# --- 黒板の配置設定 ---
+# --- 黒板の配置設定 (UI改良) ---
+st.markdown("""
+    <style>
+    /* ラジオボタンの最後の要素（黒板なし）を右に寄せるための調整 */
+    div[role="radiogroup"] > label:last-child {
+        margin-left: auto !important;
+        border-left: 1px solid #ddd;
+        padding-left: 15px;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 board_position = st.radio(
     "黒板の配置位置を選択してください",
-    ["なし", "左下", "右下", "左上", "右上"],
-    index=1,
+    ["左下", "右下", "左上", "右上", "黒板なし"],
+    index=0,
     horizontal=True
 )
 
-# --- リセット機能 ---
+# --- リセット機能 (改良版) ---
 if "uploader_key" not in st.session_state:
     st.session_state["uploader_key"] = 0
 
 def reset_app():
+    # 工事件名以外をすべてクリア
+    preserved_keys = ["project_name", "uploader_key"]
     for key in list(st.session_state.keys()):
-        if key not in ["project_name"]:
+        if key not in preserved_keys:
             del st.session_state[key]
-    st.session_state["uploader_key"] = st.session_state.get("uploader_key", 0) + 1
+    # アップローダーのキーを更新してUIを強制リセット
+    st.session_state["uploader_key"] += 1
     st.rerun()
 
 if st.button("🔄 画面をリセットして最初に戻る"):
@@ -64,6 +78,7 @@ if not st.session_state["project_name"]:
     st.warning("⚠️ 撮影の前に、ページ上部で「工事件名」を入力してください。")
     st.stop()
 
+# --- ファイルアップローダー ---
 img_file = st.file_uploader(
     "撮影または画像を選択", 
     type=["jpg", "jpeg", "png"], 
@@ -150,12 +165,10 @@ if img_file:
                         
                         if (addrData.address) {{
                             const a = addrData.address;
-                            // 市町村・区・地域・町名・丁目を網羅的に取得
                             const city = a.city || a.town || a.city_district || "";
                             const district = a.suburb || a.neighbourhood || a.village || a.subdistrict || "";
                             const detail = a.road || "";
                             const hNum = a.house_number || "";
-                            
                             fullAddressNoPref = city + district + detail + hNum;
                             if (!fullAddressNoPref) fullAddressNoPref = "住所詳細不明";
                         }}
@@ -183,7 +196,7 @@ if img_file:
                     canvas.height = oH;
                     ctx.drawImage(img, 0, 0, oW, oH);
                     
-                    if (pos !== "なし") {{
+                    if (pos !== "黒板なし") {{
                         const bW = oW * 0.3; 
                         const bH = bW * 0.75; 
                         const margin = 10;
