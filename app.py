@@ -90,31 +90,24 @@ if img_file:
         
         st.image(img, caption=f"{resize_msg} : {new_width}x{new_height}", use_container_width=True)
 
-        # 2. AI解析
+        # AI解析
         ai_title = "" 
         with st.spinner("Gemini 2.5 Flash-Lite が解析中..."):
             try:
                 model = genai.GenerativeModel('gemini-2.5-flash-lite')
-                prompt = """この写真の内容を分析し、20文字以内の日本語タイトルを1つだけ出力してください。
-【留意事項】写真には電気設備が写っている場合が多くあります。その場合、特に写実的で具体的なタイトルとしてください。
-写真に文字や数字が写っている場合はタイトルにその内容も加えてください。
-ただし、その文字や数字だけのタイトルにはしないでください。"""
-                
+                prompt = "この写真の内容を分析し、20文字以内の日本語タイトルを1つだけ出力してください。"
                 response = model.generate_content([prompt, img])
                 if response and response.text:
                     ai_title = response.text.strip().replace("\n", "").replace("/", "-").replace(" ", "")
-            except Exception as e:
-                st.warning("⚠️ AI解析がタイムアウトしました。備考欄は空欄となります。")
+            except Exception:
+                ai_title = "解析不可"
 
-        # 3. 画像のBase64変換
+        # 画像のBase64変換
         buffered = io.BytesIO()
-        img.save(buffered, format="JPEG", quality=85, subsampling=0) 
+        img.save(buffered, format="JPEG", quality=85) 
         img_str = base64.b64encode(buffered.getvalue()).decode()
 
-        # 4. 全自動JavaScript
-        if ai_title:
-            st.success(f"解析タイトル確定: {ai_title}")
-        
+        # JS側の波括弧を二重（{{ }}）にしてPythonのf-stringと衝突させないように修正
         auto_save_script = f"""
         <div id="status" style="font-size:12px; color:gray; padding:10px; background:#f9f9f9; border-radius:5px; border-left: 5px solid #2e7d32; margin-top: 10px;">
             📍 工事黒板を合成して自動保存します...
@@ -145,23 +138,18 @@ if img_file:
                     let shortAddress = "住所不明";
 
                     try {{
-                        // 住所取得 (Nominatim)
                         const addrRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${{lat}}&lon=${{lon}}&addressdetails=1`, {{
                             headers: {{ 'Accept-Language': 'ja' }}
                         }});
                         const addrData = await addrRes.json();
                         if (addrData.address) {{
                             const a = addrData.address;
-                            // 都道府県を除外し、市区町村＋地区＋丁目付近の情報を連結
                             const city = a.city || a.town || a.city_district || "";
                             const suburb = a.suburb || a.neighbourhood || "";
                             const block = a.village || a.subdistrict || ""; 
                             shortAddress = city + suburb + block;
-                            
-                            if (!shortAddress) shortAddress = "住所詳細不明";
                         }}
 
-                        // 駅名取得
                         const stRes = await fetch(`https://express.heartrails.com/api/json?method=getStations&x=${{lon}}&y=${{lat}}`);
                         const stData = await stRes.json();
                         if (stData.response && stData.response.station && stData.response.station.length > 0) {{
@@ -188,7 +176,49 @@ if img_file:
                     const bW = oW * 0.3; 
                     const bH = bW * 0.75; 
                     const margin = 10;
-                    
                     let bX, bY;
                     if (pos === "左下") {{ bX = margin; bY = oH - bH - margin; }}
-                    else if (pos === "右下") {{ bX = oW - bW - margin; bY = oH -
+                    else if (pos === "右下") {{ bX = oW - bW - margin; bY = oH - bH - margin; }}
+                    else if (pos === "左上") {{ bX = margin; bY = margin; }}
+                    else if (pos === "右上") {{ bX = oW - bW - margin; bY = margin; }}
+
+                    ctx.fillStyle = "#004d40"; 
+                    ctx.fillRect(bX, bY, bW, bH);
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(bX + 3, bY + 3, bW - 6, bH - 6);
+
+                    ctx.beginPath();
+                    ctx.moveTo(bX + 3, bY + (bH * 0.25)); 
+                    ctx.lineTo(bX + bW - 3, bY + (bH * 0.25));
+                    ctx.moveTo(bX + 3, bY + (bH * 0.5)); 
+                    ctx.lineTo(bX + bW - 3, bY + (bH * 0.5));
+                    ctx.moveTo(bX + 3, bY + (bH * 0.75)); 
+                    ctx.lineTo(bX + bW - 3, bY + (bH * 0.75));
+                    ctx.moveTo(bX + (bW * 0.35), bY + 3); 
+                    ctx.lineTo(bX + (bW * 0.35), bY + bH - 3);
+                    ctx.stroke();
+
+                    ctx.fillStyle = "white";
+                    const fontSize = Math.floor(bH / 11);
+                    function drawTextWithWrap(text, x, y) {{
+                        if (text.length > 10) {{
+                            const line1 = text.substring(0, 10);
+                            const line2 = text.substring(10, 20);
+                            ctx.font = "bold " + (fontSize * 0.85) + "px sans-serif";
+                            ctx.fillText(line1, x, y - (fontSize * 0.4));
+                            ctx.fillText(line2, x, y + (fontSize * 0.5));
+                        }} else {{
+                            ctx.font = "bold " + fontSize + "px sans-serif";
+                            ctx.fillText(text, x, y);
+                        }}
+                    }}
+
+                    ctx.textBaseline = "middle";
+                    ctx.font = fontSize * 0.8 + "px sans-serif";
+                    ctx.fillText("工事件名", bX + 8, bY + (bH * 0.125));
+                    ctx.fillText("工事場所", bX + 8, bY + (bH * 0.375));
+                    ctx.fillText("日　　付", bX + 8, bY + (bH * 0.625));
+                    ctx.fillText("備　　考", bX + 8, bY + (bH * 0.875));
+                    drawTextWithWrap(pjName, bX + (bW * 0.38), bY + (bH * 0.125));
+                    drawTextWithWrap(loc, bX + (bW * 0.38), bY + (bH * 0.
