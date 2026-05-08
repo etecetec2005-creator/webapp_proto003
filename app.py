@@ -63,7 +63,7 @@ if img_file:
     with st.spinner("施錠状態を詳細に分析中..."):
         try:
             # 最新のFlashモデルを使用
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai.GenerativeModel('gemini-2.5-flash-lite')
             
             prompt = """
 提出された写真の門扉、閂（かんぬき）、南京錠の施錠状態を厳密に分析してください。
