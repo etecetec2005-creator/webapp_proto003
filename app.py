@@ -41,14 +41,24 @@ st.markdown("""
 st.title("🔐 施錠よし！")
 st.caption("門扉・閂・南京錠の施錠状態をAIで確認します")
 
+# リセット機能のためのセッション状態
+if "reset_count" not in st.session_state:
+    st.session_state.reset_count = 0
+
+# リセットボタン
+if st.button("🔄 撮り直す（リセット）"):
+    st.session_state.reset_count += 1
+    st.rerun()
+
 # 入力ソースの選択
 input_method = st.radio("入力方法を選択してください", ["カメラで撮影", "画像をアップロード"])
 
 img_file = None
+# keyにreset_countを含めることで、ボタン押下時にウィジェットを初期化
 if input_method == "カメラで撮影":
-    img_file = st.camera_input("門扉を撮影", key="lock_camera")
+    img_file = st.camera_input("門扉を撮影", key=f"lock_camera_{st.session_state.reset_count}")
 else:
-    img_file = st.file_uploader("画像を選択してください", type=["jpg", "jpeg", "png"], key="lock_upload")
+    img_file = st.file_uploader("画像を選択してください", type=["jpg", "jpeg", "png"], key=f"lock_upload_{st.session_state.reset_count}")
 
 if img_file:
     # 1. 画像の読み込み
@@ -62,7 +72,7 @@ if img_file:
     
     with st.spinner("施錠状態を詳細に分析中..."):
         try:
-            # 最新のFlashモデルを使用
+            # 指定のモデルを使用
             model = genai.GenerativeModel('gemini-2.5-flash-lite')
             
             prompt = """
